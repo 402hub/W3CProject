@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - Telegram Killer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .offline-container {
+      text-align: center;
+      max-width: 500px;
+    }
+
+    .offline-icon {
+      font-size: 5rem;
+      margin-bottom: 1rem;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.7;
+        transform: scale(0.95);
+      }
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    p {
+      font-size: 1.2rem;
+      opacity: 0.9;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .features {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(10px);
+    }
+
+    .features h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+    }
+
+    .feature-list {
+      list-style: none;
+      text-align: left;
+    }
+
+    .feature-list li {
+      padding: 0.5rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .feature-list li:before {
+      content: '✓';
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      text-align: center;
+      line-height: 24px;
+      font-weight: bold;
+    }
+
+    .retry-btn {
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+      background: white;
+      color: #667eea;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .retry-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .status {
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-container">
+    <div class="offline-icon">📴</div>
+    <h1>You're Offline</h1>
+    <p>
+      No internet connection detected, but don't worry!<br>
+      Your Telegram Killer app still works.
+    </p>
+
+    <div class="features">
+      <h2>Offline Mode Features:</h2>
+      <ul class="feature-list">
+        <li>View all cached conversations</li>
+        <li>Read message history</li>
+        <li>Compose new messages (queued)</li>
+        <li>Messages auto-send when online</li>
+        <li>Local media cache available</li>
+      </ul>
+    </div>
+
+    <button class="retry-btn" onclick="window.location.reload()">
+      🔄 Retry Connection
+    </button>
+
+    <div class="status" id="status">
+      Checking connection...
+    </div>
+  </div>
+
+  <script>
+    // Auto-retry connection
+    let retryCount = 0;
+    const maxRetries = 5;
+
+    function checkConnection() {
+      retryCount++;
+      const status = document.getElementById('status');
+      
+      if (navigator.onLine) {
+        status.textContent = 'Back online! Reloading...';
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        status.textContent = `Offline - Retry ${retryCount}/${maxRetries}`;
+        
+        if (retryCount < maxRetries) {
+          setTimeout(checkConnection, 3000);
+        } else {
+          status.textContent = 'Still offline. Click retry when ready.';
+        }
+      }
+    }
+
+    // Listen for online event
+    window.addEventListener('online', () => {
+      document.getElementById('status').textContent = 'Connection restored! Reloading...';
+      setTimeout(() => window.location.reload(), 1000);
+    });
+
+    // Start checking
+    setTimeout(checkConnection, 2000);
+  </script>
+</body>
+</html>
