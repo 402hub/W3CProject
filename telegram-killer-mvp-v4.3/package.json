@@ -1,0 +1,26 @@
+{
+  "name": "telegram-killer-v4.3",
+  "version": "4.3.0",
+  "description": "Web3 Messaging App - P2P Sync with Firebase",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "dexie": "^4.0.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "wagmi": "^2.13.5",
+    "viem": "^2.21.54",
+    "@tanstack/react-query": "^5.62.8",
+    "@wagmi/connectors": "^5.4.2",
+    "zustand": "^5.0.2",
+    "firebase": "^10.7.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}
