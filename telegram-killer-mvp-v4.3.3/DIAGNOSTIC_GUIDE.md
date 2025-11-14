@@ -1,4 +1,8 @@
-# 🔍 v4.3.2 - DIAGNOSTIC VERSION
+# 🔍 v4.3.2 - DIAGNOSTIC VERSION _(Deprecated)_
+
+> **Heads up:** This guide documents the previous debug-only build.  
+> The new v4.4.0 release fixes the rendering bug, adds pagination, signatures, CSP, and more.  
+> Refer to `README.md` for the current architecture and playbook. The legacy notes below are kept for historical context.
 
 ## 🎯 **EXCELLENT BUG REPORT, BOSS!**
 

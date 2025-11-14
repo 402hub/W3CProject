@@ -32,6 +32,19 @@ function App() {
 
   const [isInitializing, setIsInitializing] = useState(false);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+    if (!isLocalhost && window.location.protocol !== 'https:') {
+      const target = `https://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}`;
+      window.location.replace(target);
+    }
+  }, []);
+
   // Handle wallet connection
   useEffect(() => {
     if (isConnected && address) {
@@ -108,7 +121,7 @@ function App() {
       <header className="app-header">
         <div className="header-left">
           <h1>⚡ Tello</h1>
-          <span className="version-badge">v4.3.3</span>
+            <span className="version-badge">v4.4.0</span>
         </div>
         
         {isConnected && (
@@ -140,18 +153,18 @@ function App() {
         {!isConnected ? (
           <div className="welcome-screen">
             <div className="welcome-content">
-              <h2>Welcome to Tello v4.3.3</h2>
-              <p className="subtitle">🚀 Real P2P + Fixed WalletConnect!</p>
+                <h2>Welcome to Tello v4.4.0</h2>
+                <p className="subtitle">🔐 Performance & Security Foundation</p>
               <div className="features-list">
-                <div className="feature">🔥 Real-time P2P message delivery</div>
-                <div className="feature">📱 WalletConnect working (fixed!)</div>
-                <div className="feature">⚡ Instant local-first UI</div>
-                <div className="feature">🔒 Wallet-isolated conversations</div>
-                <div className="feature">📱 Full mobile wallet support</div>
+                  <div className="feature">🔥 Paginated Firebase + IndexedDB sync</div>
+                  <div className="feature">👛 Wallet-signed messages & auth</div>
+                  <div className="feature">🛡️ CSP + HTTPS enforcement</div>
+                  <div className="feature">⚖️ 60 msg/min rate limiting</div>
+                  <div className="feature">✅ Sanitized inputs & validation</div>
               </div>
               <p className="description">
-                Fast, secure messaging with wallet-based authentication.
-                Messages sync in real-time via Firebase!
+                  Load millions of messages confidently. Every payload is validated,
+                  signed, indexed, and throttled for production-grade scale.
               </p>
               <WalletConnect />
             </div>

@@ -12,6 +12,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
+import { getPerformance } from 'firebase/performance';
 
 // TODO: Replace with your actual Firebase config
 // Get this from Firebase Console > Project Settings > Your apps
@@ -28,8 +29,17 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
+let performanceMonitor = null;
+if (typeof window !== 'undefined') {
+  try {
+    performanceMonitor = getPerformance(app);
+  } catch (error) {
+    console.warn('⚠️  [FIREBASE] Performance monitoring unavailable', error);
+  }
+}
+
 // Get Realtime Database instance
 const database = getDatabase(app);
 
-export { database };
+export { database, performanceMonitor as performance };
 export default app;

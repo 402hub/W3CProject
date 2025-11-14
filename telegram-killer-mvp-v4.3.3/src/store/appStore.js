@@ -18,9 +18,13 @@ export const useAppStore = create((set, get) => ({
   // Conversations state
   conversations: [],
   currentConversation: null,
+  conversationCursor: null,
+  hasMoreConversations: true,
   
   // Messages state
   messages: [],
+  messageCursor: null,
+  hasMoreMessages: false,
   
   // UI state
   isLoading: false,
@@ -41,6 +45,10 @@ export const useAppStore = create((set, get) => ({
     conversations: [],
     currentConversation: null,
     messages: [],
+    conversationCursor: null,
+    hasMoreConversations: true,
+    messageCursor: null,
+    hasMoreMessages: false,
     status: 'Wallet disconnected',
   }),
   
@@ -56,13 +64,29 @@ export const useAppStore = create((set, get) => ({
     status: `Error: ${error.message}`,
   }),
   
-  setConversations: (conversations) => set({ conversations }),
+  setConversations: (conversations, options = {}) => set({
+    conversations,
+    conversationCursor: options.cursor ?? null,
+    hasMoreConversations: options.hasMore ?? true,
+  }),
+
+  appendConversations: (newConversations = [], options = {}) => set((state) => {
+    const existingIds = new Set(state.conversations.map((c) => c.id));
+    const deduped = newConversations.filter((convo) => !existingIds.has(convo.id));
+    return {
+      conversations: [...state.conversations, ...deduped],
+      conversationCursor: options.cursor ?? state.conversationCursor,
+      hasMoreConversations: options.hasMore ?? state.hasMoreConversations,
+    };
+  }),
   
   setCurrentConversation: (conversation) => {
     console.log('🔄 [Store] Setting current conversation:', conversation);
     set({
       currentConversation: conversation,
       messages: [], // Clear messages when switching conversations
+      messageCursor: null,
+      hasMoreMessages: false,
       status: conversation 
         ? `Chatting with ${conversation.peerAddress.slice(0, 6)}...${conversation.peerAddress.slice(-4)}`
         : 'Select a conversation',
@@ -74,11 +98,25 @@ export const useAppStore = create((set, get) => ({
     messages: [...state.messages, message],
   })),
   
-  setMessages: (messages) => {
+  setMessages: (messages, options = {}) => {
     console.log('📥 [Store] Setting messages:', messages.length, messages);
-    set({ messages });
+    set({
+      messages,
+      messageCursor: options.cursor ?? null,
+      hasMoreMessages: options.hasMore ?? false,
+    });
     console.log('✅ [Store] Messages state updated');
   },
+
+  prependMessages: (olderMessages = [], options = {}) => set((state) => {
+    const existingIds = new Set(state.messages.map((msg) => msg.id));
+    const deduped = olderMessages.filter((msg) => !existingIds.has(msg.id));
+    return {
+      messages: [...deduped, ...state.messages],
+      messageCursor: options.cursor ?? state.messageCursor,
+      hasMoreMessages: options.hasMore ?? state.hasMoreMessages,
+    };
+  }),
   
   addMessageOptimistic: (content, tempId) => {
     const state = get();

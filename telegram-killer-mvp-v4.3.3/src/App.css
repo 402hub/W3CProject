@@ -342,9 +342,23 @@ body {
   cursor: not-allowed;
 }
 
+.input-error {
+  color: var(--status-failed);
+  font-size: 0.8rem;
+  margin-top: 0.35rem;
+}
+
 .conversations-list {
   flex: 1;
   overflow-y: auto;
+  position: relative;
+}
+
+.list-loader {
+  text-align: center;
+  padding: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
 }
 
 .empty-conversations {
@@ -493,6 +507,36 @@ body {
   overflow-y: auto;
   padding: 1rem;
   background: #e5ddd5;
+  position: relative;
+}
+
+.messages-loader {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.load-more-messages {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.load-more-messages:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.load-more-messages:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .empty-messages {
@@ -564,6 +608,23 @@ body {
   border-top: 1px solid var(--border-color);
 }
 
+.scroll-to-latest {
+  align-self: flex-end;
+  margin: 0.25rem 1rem;
+  padding: 0.35rem 0.9rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-color);
+  color: white;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.scroll-to-latest:hover {
+  background: var(--secondary-color);
+}
+
 .message-input-container form {
   display: flex;
   gap: 0.5rem;
@@ -606,6 +667,26 @@ body {
 .send-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.input-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.char-counter {
+  font-family: 'Courier New', monospace;
+}
+
+.char-counter-error {
+  color: var(--status-failed);
+}
+
+.send-error {
+  color: var(--status-failed);
 }
 
 /* Debug Panel */

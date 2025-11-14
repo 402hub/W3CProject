@@ -1,0 +1,26 @@
+{
+  "rules": {
+    "conversations": {
+      "$conversationId": {
+        ".read": "auth != null && root.child('conversations').child($conversationId).child('participants').child(auth.token.walletAddress).val() === true",
+        ".write": "auth != null && auth.token.walletAddress != null",
+        "participants": {
+          "$address": {
+            ".validate": "newData.isBoolean()"
+          }
+        },
+        "meta": {
+          ".read": "auth != null && root.child('conversations').child($conversationId).child('participants').child(auth.token.walletAddress).val() === true",
+          ".write": "auth != null && auth.token.walletAddress != null",
+          ".indexOn": ["lastMessageTime"]
+        },
+        "messages": {
+          ".indexOn": ["timestamp", "senderAddress"],
+          "$messageId": {
+            ".validate": "newData.hasChildren(['senderAddress','recipientAddress','content','timestamp','signature','version']) && newData.child('content').isString() && newData.child('content').val().length <= 1000 && newData.child('timestamp').isNumber() && newData.child('senderAddress').val() === auth.token.walletAddress && newData.child('signature').isString()"
+          }
+        }
+      }
+    }
+  }
+}

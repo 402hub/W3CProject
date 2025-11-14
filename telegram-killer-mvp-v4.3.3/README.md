@@ -1,227 +1,91 @@
-# ⚡ Telegram Killer v4.3.2 - Debug Version
+# ⚡ Telegram Killer v4.4.0 – Performance & Security Foundation
 
-## 🔍 **THIS IS A DEBUG VERSION**
-
-Boss, we've added **extensive console logging** to diagnose why messages aren't showing in the receiver's chat area.
-
-### **The Problem:**
-- ✅ Messages sent successfully
-- ✅ Messages received via Firebase
-- ✅ Messages saved to local database
-- ✅ Conversation appears in sidebar with preview
-- ❌ **Messages don't show when clicking the conversation!**
-
-### **What This Version Does:**
-Added detailed console logging at every step to trace exactly what's happening.
+This release converts the old debug build into a production-ready messaging client that can survive real traffic spikes. We focused on performance, data integrity, and security hardening *before* adding UX sugar.
 
 ---
 
-## 🧪 **HOW TO TEST**
+## ✅ What’s New in v4.4.0
 
-### **Setup:**
+- **Wallet-based authentication** – every message is signed with the sender’s wallet and verified before it ever renders.
+- **Realtime pagination** – messages load 70 at a time (newest first) with “Load older” controls and scroll-to-bottom awareness.
+- **Conversation lazy loading** – pull just 20 conversations at a time with virtual scrolling and infinite fetch on scroll.
+- **Input validation & sanitization** – 1000 character limit, empty-message prevention, `<script>` stripping, and form sanitation.
+- **Rate limiting** – 60 messages per minute per wallet enforced client-side to kill spam before it hits Firebase.
+- **Firebase upgrades**
+  - Indexed queries for timestamp / sender lookups (`.indexOn` rules).
+  - Wallet-gated Realtime DB rules with message validation.
+  - Performance Monitoring initialized out of the box.
+  - Hosting headers (CSP, HSTS, Referrer-Policy) for production deploys.
+- **Browser security** – strict CSP meta tags, HTTPS enforcement (auto redirect), and CSP-aware dev server headers.
+
+---
+
+## 🛠️ Setup
+
 ```bash
+cd telegram-killer-mvp-v4.3.3
 npm install
 npm run dev
 ```
 
-### **Test with 2 Browsers:**
-
-**Browser 1 (Sender):**
-1. Connect Wallet A
-2. Send message to Wallet B
-3. Watch console logs
-
-**Browser 2 (Receiver):**
-1. Connect Wallet B
-2. See conversation appear in sidebar ✓
-3. Click the conversation
-4. **WATCH THE CONSOLE CAREFULLY!**
+1. **Configure wallets** – update `src/config.js` with your WalletConnect project id.
+2. **Firebase**  
+   - Create a project + Realtime Database.
+   - Copy your config into `src/firebase.js`.
+   - Deploy the rules/hosting config inside `/firebase`:
+     ```bash
+     firebase deploy --only database,hosting
+     ```
+     (imports `database.rules.json` + `firebase.json`)
+3. **Run locally** – `npm run dev`, open `https://localhost:3000` (or `http://localhost` if you prefer, HTTPS auto-enforced elsewhere).
 
 ---
 
-## 📋 **CONSOLE LOGS TO LOOK FOR**
+## 🔐 Security & Compliance Checklist
 
-When you click a conversation, you should see this sequence:
-
-### **Step 1: Select Conversation**
-```
-🔄 [Store] Setting current conversation: {id: "0x..._0x...", peerAddress: "0x..."}
-✅ [Store] Current conversation set, messages cleared
-```
-
-### **Step 2: Load Messages Triggered**
-```
-🔍 [ChatArea] Loading messages for: 0x...
-💬 [DB] Loading messages with: 0x...
-🔑 [DB] My wallet: 0x...
-🆔 [DB] Query conversationId: 0x..._0x...
-```
-
-### **Step 3: Messages Retrieved**
-```
-✅ [DB] Loaded 3 messages from local storage
-📋 [DB] Messages: [{...}, {...}, {...}]
-📦 [ChatArea] Loaded messages: 3 [{...}, {...}, {...}]
-```
-
-### **Step 4: State Update**
-```
-✅ [ChatArea] Messages set in store
-📥 [Store] Setting messages: 3 [{...}, {...}, {...}]
-✅ [Store] Messages state updated
-```
-
-### **Step 5: Component Renders**
-```
-🔄 [ChatArea] Messages state updated: 3 [{...}, {...}, {...}]
-```
+- **Wallet signature verification** – `messageService` requires a signed payload per message and rejects anything without a valid sig.
+- **Firebase Realtime DB rules** – enforce wallet ownership, length validation, and timestamp checks while indexing `timestamp` & `senderAddress` for fast queries.
+- **Rate limiting** – 60 msg/min per wallet with friendly UX error.
+- **Data sanitization** – script tags removed, whitespace normalized, addresses validated before use.
+- **Browser headers** – CSP + HSTS baked into `index.html`, `vite.config.js`, and hosting config. Non-localhost HTTP requests auto-redirect to HTTPS.
 
 ---
 
-## 🎯 **WHAT WE'RE DIAGNOSING**
+## ⚙️ Performance Features
 
-### **Possible Issues:**
-
-**Issue 1: conversationId Mismatch**
-- Messages saved with one conversationId
-- Query using different conversationId
-- **Look for:** Different IDs in logs
-
-**Issue 2: peerAddress undefined/incorrect**
-- Conversation object missing peerAddress
-- **Look for:** peerAddress: undefined
-
-**Issue 3: State Not Updating**
-- Messages loaded but not set in store
-- **Look for:** Missing "Messages state updated" log
-
-**Issue 4: Rendering Issue**
-- Messages in state but not rendering
-- **Look for:** State shows messages but UI shows "No messages yet"
+| Area | Upgrade |
+|------|---------|
+| Messages | 70-per-page pagination, cached ranges, scroll-aware auto load |
+| Conversations | Lazy load (20 at a time) + simple virtualization |
+| Firebase | `.indexOn` for `timestamp`/`senderAddress`, metadata writes for participants |
+| Client | Dexie compound index `[conversationId+timestamp]` for fast range scans |
 
 ---
 
-## 📸 **WHAT TO SEND US**
+## 🧪 Testing Matrix
 
-**Take screenshots of:**
-1. The console logs when clicking the conversation
-2. The chat area showing "No messages yet"
-3. The conversation sidebar showing the preview
-
-**Or copy/paste the console logs**, focusing on:
-- The conversationId being used
-- The peerAddress being passed
-- The messages array being loaded
-- The messages array being set in state
-- The final messages state in the component
+| Scenario | Steps |
+|----------|-------|
+| **Dual browser** | Run `npm run dev`, connect Wallet A (normal window) + Wallet B (incognito). Send >70 messages to test pagination + signatures. |
+| **Rate limit** | Spam 60+ messages in under a minute – UI should block with descriptive error. |
+| **Conversation load** | Create 25+ conversations and scroll; the list should lazily fetch more without freezing. |
+| **Security smoke** | Flip to HTTP on a non-local host – app should auto-upgrade to HTTPS. Try injecting `<script>` in messages – text should render safely. |
 
 ---
 
-## 🔧 **WHAT WE CHANGED**
+## 📁 Key Files
 
-### **Added Debug Logging To:**
-
-1. **appStore.js:**
-   - setCurrentConversation()
-   - setMessages()
-
-2. **database.js:**
-   - loadMessages() (detailed query logging)
-
-3. **ChatArea.jsx:**
-   - loadMessages() (before/after)
-   - messages state changes (useEffect)
-
-### **No Functionality Changes**
-- All the same code as v4.3.1
-- Just added console.log() statements
-- This will help us find the bug!
+- `src/services/database.js` – Dexie schema upgrades, Firebase listeners, caching, rate limiting, signature verification.
+- `src/components/ChatArea.jsx` – message pagination, “Load older” controls, char counter, scroll-to-bottom guard.
+- `src/components/ConversationList.jsx` – lazy loading + simple virtualization.
+- `src/security.js` – shared sanitization, limits, wallet helpers.
+- `firebase/database.rules.json` – wallet-based rules + indexes.
+- `firebase/firebase.json` – production hosting headers (CSP/HSTS).
 
 ---
 
-## 🎯 **NEXT STEPS**
+## 🚀 Next (Phase 2 Preview)
 
-### **After Running This:**
+With the foundation locked, Phase 2 will layer on typing indicators, delivery/read receipts, relative timestamps, and conversation search **without** regressing the work above.
 
-1. Send message from Wallet A to Wallet B
-2. On Wallet B, click the conversation
-3. Copy ALL the console logs
-4. Send them to us
-
-**We'll analyze the logs and fix the actual bug in v4.3.3!**
-
----
-
-## ⚡ **QUICK TEST**
-
-```bash
-# Terminal 1 (Sender)
-npm run dev
-# Connect Wallet A
-# Send "Debug test message" to Wallet B
-
-# Terminal 2 (Receiver - Incognito)
-# Open http://localhost:3000
-# Connect Wallet B
-# Click the conversation
-# COPY CONSOLE LOGS!
-```
-
----
-
-## 🔍 **COMMON PATTERNS**
-
-### **If you see:**
-```
-🆔 [DB] Query conversationId: 0xabc_0xdef
-✅ [DB] Loaded 0 messages
-```
-→ **Issue:** conversationId mismatch or messages not saved
-
-### **If you see:**
-```
-✅ [DB] Loaded 3 messages
-📦 [ChatArea] Loaded messages: 3 [...]
-✅ [ChatArea] Messages set in store
-📥 [Store] Setting messages: 0 []
-```
-→ **Issue:** Messages lost between ChatArea and Store
-
-### **If you see:**
-```
-📥 [Store] Setting messages: 3 [...]
-🔄 [ChatArea] Messages state updated: 0 []
-```
-→ **Issue:** Store updated but component not receiving updates
-
----
-
-## 💡 **WHY THIS APPROACH?**
-
-**Your Feedback:**
-> "We can't fix something and then break something else"
-
-**Our Response:**
-✅ Not changing any functionality
-✅ Just adding logging to diagnose
-✅ Once we find the bug, we'll fix ONLY that
-✅ Minimal changes philosophy!
-
----
-
-## 🚀 **READY TO DEBUG!**
-
-**Just:**
-1. `npm install`
-2. `npm run dev`
-3. Test with 2 browsers
-4. Send us the console logs!
-
-**We'll identify the exact issue and fix it properly!** 🎯
-
----
-
-**Version:** 4.3.2 (Debug)  
-**Purpose:** Diagnose message rendering issue  
-**Changes:** Console logging only  
-**Status:** Debug/Diagnostic
+Stay safe, stay fast. 💚

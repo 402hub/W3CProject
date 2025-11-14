@@ -1,122 +1,193 @@
 /**
  * ChatArea Component
- * Displays messages with status indicators and timestamps
- * v4.1: Added message status (sending/sent/failed) and time display
+ * v4.4: Secure messaging with pagination, rate limiting, and wallet signatures.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSignMessage } from 'wagmi';
 import { useAppStore } from '../store/appStore';
 import { messageService } from '../services/database';
 import { formatMessageTime } from '../utils';
+import { MESSAGE_CHAR_LIMIT, getMessageCharactersRemaining } from '../security';
 
 function ChatArea() {
   const {
     currentConversation,
     messages,
     walletAddress,
-    addMessage,
     setMessages,
     addMessageOptimistic,
     confirmMessage,
     failMessage,
+    prependMessages,
+    messageCursor,
+    hasMoreMessages,
+    setStatus,
   } = useAppStore();
 
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [sendError, setSendError] = useState(null);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
-  // Debug: Log messages state changes
+  const { signMessageAsync } = useSignMessage();
+
+  // Debug log for state changes
   useEffect(() => {
-    console.log('🔄 [ChatArea] Messages state updated:', messages.length, messages);
+    console.log('🔄 [ChatArea] Messages state updated:', messages.length);
   }, [messages]);
 
-  // Load messages when conversation changes
-  useEffect(() => {
-    if (currentConversation) {
-      loadMessages();
-      
-      // Listen for new messages in this conversation
-      const unsubscribe = messageService.onMessage((newMessage) => {
-        // If message is for current conversation, reload
-        if (newMessage.conversationId === currentConversation.id) {
-          console.log('📬 [UI] New message in current conversation, reloading...');
-          loadMessages();
+  const scrollToBottom = useCallback(
+    (behavior = 'smooth') => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior });
+      }
+    },
+    [],
+  );
+
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    const { scrollTop, clientHeight, scrollHeight } = messagesContainerRef.current;
+    const nearBottom = scrollHeight - (scrollTop + clientHeight) < 120;
+    setAutoScrollEnabled(nearBottom);
+  };
+
+  const loadLatestMessages = useCallback(
+    async (withSpinner = false) => {
+      if (!currentConversation) return;
+      if (withSpinner) {
+        setIsLoadingMessages(true);
+      }
+      try {
+        const payload = await messageService.loadMessagesPage(currentConversation.peerAddress);
+        setMessages(payload.messages, {
+          cursor: payload.cursor,
+          hasMore: payload.hasMore,
+        });
+      } catch (error) {
+        console.error('❌ [ChatArea] Failed to load messages:', error);
+        setStatus(`Failed to load messages: ${error.message}`);
+      } finally {
+        if (withSpinner) {
+          setIsLoadingMessages(false);
         }
+      }
+    },
+    [currentConversation, setMessages, setStatus],
+  );
+
+  const loadOlderMessages = async () => {
+    if (!currentConversation || !hasMoreMessages || !messageCursor || isLoadingOlder) {
+      return;
+    }
+    setIsLoadingOlder(true);
+    try {
+      const payload = await messageService.loadMessagesPage(currentConversation.peerAddress, {
+        beforeTimestamp: messageCursor,
       });
-      
-      return () => {
-        unsubscribe();
-      };
-    }
-  }, [currentConversation]);
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const loadMessages = async () => {
-    if (!currentConversation) return;
-
-    try {
-      console.log('🔍 [ChatArea] Loading messages for:', currentConversation.peerAddress);
-      const loadedMessages = await messageService.loadMessages(currentConversation.peerAddress);
-      console.log('📦 [ChatArea] Loaded messages:', loadedMessages.length, loadedMessages);
-      setMessages(loadedMessages);
-      console.log('✅ [ChatArea] Messages set in store');
+      prependMessages(payload.messages, {
+        cursor: payload.cursor,
+        hasMore: payload.hasMore,
+      });
     } catch (error) {
-      console.error('❌ [ChatArea] Failed to load messages:', error);
-    }
-  };
-
-  const sendMessage = async (e) => {
-    e.preventDefault();
-    
-    const content = messageInput.trim();
-    if (!content || !currentConversation) return;
-
-    // Generate temp ID for optimistic update
-    const tempId = `temp-${Date.now()}`;
-    
-    // Optimistic update - show message immediately
-    addMessageOptimistic(content, tempId);
-    
-    // Clear input
-    setMessageInput('');
-    setIsSending(true);
-
-    try {
-      // Send message (saves to database)
-      const messageId = await messageService.sendMessage(currentConversation.peerAddress, content);
-      
-      // Confirm message sent with real ID
-      confirmMessage(tempId, messageId);
-      
-      // Reload messages to get the actual saved message
-      await loadMessages();
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      // Mark message as failed
-      failMessage(tempId);
-      alert('Failed to send message. Please try again.');
+      console.error('❌ [ChatArea] Failed to load older messages:', error);
+      setStatus(`Unable to load older messages: ${error.message}`);
     } finally {
-      setIsSending(false);
+      setIsLoadingOlder(false);
     }
   };
+
+  // Load on conversation change and subscribe for live updates
+  useEffect(() => {
+    if (!currentConversation) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    (async () => {
+      await loadLatestMessages(true);
+      if (isMounted) {
+        scrollToBottom('auto');
+      }
+    })();
+
+    const unsubscribe = messageService.onMessage((newMessage) => {
+      if (newMessage.conversationId === currentConversation.id) {
+        loadLatestMessages(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [currentConversation, loadLatestMessages, scrollToBottom]);
+
+  // Auto-scroll if the user is anchored at the bottom
+  useEffect(() => {
+    if (autoScrollEnabled) {
+      scrollToBottom('smooth');
+    }
+  }, [messages, autoScrollEnabled, scrollToBottom]);
 
   const getMessageStatusIcon = (message) => {
     if (message.status === 'sending') {
       return '⏳';
-    } else if (message.status === 'failed') {
+    }
+    if (message.status === 'failed') {
       return '❌';
-    } else if (message.status === 'sent') {
-      return '✓';
     }
     return '✓';
+  };
+
+  const charsRemaining = getMessageCharactersRemaining(messageInput);
+
+  const handleSend = async (event) => {
+    event.preventDefault();
+    if (!currentConversation || isSending) {
+      return;
+    }
+
+    setSendError(null);
+
+    let preparedMessage;
+    try {
+      preparedMessage = messageService.prepareMessagePayload(
+        currentConversation.peerAddress,
+        messageInput,
+      );
+    } catch (error) {
+      setSendError(error.message);
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    addMessageOptimistic(preparedMessage.content, tempId);
+    setMessageInput('');
+    setIsSending(true);
+
+    try {
+      const signature = await signMessageAsync({ message: preparedMessage.payload });
+      const messageId = await messageService.sendMessage(preparedMessage, signature);
+      confirmMessage(tempId, messageId);
+      await loadLatestMessages(false);
+      setStatus('Message sent securely');
+    } catch (error) {
+      console.error('❌ [ChatArea] Failed to send message:', error);
+      const friendlyError = error?.shortMessage || error?.message || 'Failed to send message.';
+      failMessage(tempId);
+      setSendError(friendlyError);
+      setStatus(friendlyError);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   if (!currentConversation) {
@@ -131,7 +202,10 @@ function ChatArea() {
     );
   }
 
-  const shortAddress = `${currentConversation.peerAddress.slice(0, 6)}...${currentConversation.peerAddress.slice(-4)}`;
+  const shortAddress = `${currentConversation.peerAddress.slice(
+    0,
+    6,
+  )}...${currentConversation.peerAddress.slice(-4)}`;
 
   return (
     <div className="chat-area">
@@ -142,8 +216,27 @@ function ChatArea() {
         </div>
       </div>
 
-      <div className="messages-container">
-        {messages.length === 0 ? (
+      <div
+        className="messages-container"
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+      >
+        {isLoadingMessages && (
+          <div className="messages-loader">Loading messages…</div>
+        )}
+
+        {hasMoreMessages && (
+          <button
+            className="load-more-messages"
+            type="button"
+            onClick={loadOlderMessages}
+            disabled={isLoadingOlder}
+          >
+            {isLoadingOlder ? 'Loading older messages…' : 'Load older messages'}
+          </button>
+        )}
+
+        {messages.length === 0 && !isLoadingMessages ? (
           <div className="empty-messages">
             <p>No messages yet</p>
             <p className="hint">Send the first message to start the conversation!</p>
@@ -151,7 +244,6 @@ function ChatArea() {
         ) : (
           messages.map((message) => {
             const isMine = message.senderAddress?.toLowerCase() === walletAddress?.toLowerCase();
-            
             return (
               <div
                 key={message.id}
@@ -161,25 +253,43 @@ function ChatArea() {
                 <div className="message-meta">
                   <span className="message-time">{formatMessageTime(message.timestamp)}</span>
                   {isMine && (
-                    <span className="message-status">{getMessageStatusIcon(message)}</span>
+                    <span className="message-status" title={message.status}>
+                      {getMessageStatusIcon(message)}
+                    </span>
                   )}
                 </div>
               </div>
             );
           })
         )}
+
         <div ref={messagesEndRef} />
       </div>
 
+      {!autoScrollEnabled && messages.length > 0 && (
+        <button
+          type="button"
+          className="scroll-to-latest"
+          onClick={() => {
+            scrollToBottom('smooth');
+            setAutoScrollEnabled(true);
+          }}
+        >
+          Scroll to latest ↓
+        </button>
+      )}
+
       <div className="message-input-container">
-        <form onSubmit={sendMessage}>
+        <form onSubmit={handleSend}>
           <input
             type="text"
             value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
+            onChange={(event) => setMessageInput(event.target.value.slice(0, MESSAGE_CHAR_LIMIT))}
             placeholder="Type a message..."
             disabled={isSending}
             className="message-input"
+            maxLength={MESSAGE_CHAR_LIMIT}
+            autoComplete="off"
           />
           <button
             type="submit"
@@ -189,6 +299,12 @@ function ChatArea() {
             {isSending ? '...' : '➤'}
           </button>
         </form>
+        <div className="input-meta">
+          <span className={`char-counter ${charsRemaining < 0 ? 'char-counter-error' : ''}`}>
+            {charsRemaining} chars left
+          </span>
+          {sendError && <span className="send-error">{sendError}</span>}
+        </div>
       </div>
     </div>
   );
