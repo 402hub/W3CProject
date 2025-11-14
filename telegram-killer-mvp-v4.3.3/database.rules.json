@@ -1,0 +1,26 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "conversations": {
+      "$conversationId": {
+        ".read": "auth != null && auth.token.walletAddress != null && $conversationId.length == 85 && ($conversationId.substring(0, 42) == auth.token.walletAddress || $conversationId.substring(43, 85) == auth.token.walletAddress)",
+        ".write": "auth != null && auth.token.walletAddress != null",
+        "messages": {
+          ".indexOn": ["timestamp"],
+          "$messageId": {
+            ".validate": "auth != null && auth.token.walletAddress != null && newData.hasChildren(['senderAddress','recipientAddress','content','timestamp','rateLimitBucket']) && newData.child('senderAddress').isString() && newData.child('recipientAddress').isString() && newData.child('content').isString() && newData.child('timestamp').isNumber() && newData.child('rateLimitBucket').isString() && newData.child('content').val().length > 0 && newData.child('content').val().length <= 1000 && newData.child('senderAddress').val() == auth.token.walletAddress && $conversationId.length == 85 && ( ($conversationId.substring(0, 42) == auth.token.walletAddress && $conversationId.substring(43, 85) == newData.child('recipientAddress').val()) || ($conversationId.substring(43, 85) == auth.token.walletAddress && $conversationId.substring(0, 42) == newData.child('recipientAddress').val()) )"
+          }
+        },
+        "lastMessage": {
+          ".validate": "auth != null && auth.token.walletAddress != null && newData.hasChildren(['content','timestamp','senderAddress']) && newData.child('senderAddress').val() == auth.token.walletAddress && newData.child('content').isString() && newData.child('content').val().length <= 1000 && newData.child('timestamp').isNumber()"
+        },
+        "participants": {
+          "$wallet": {
+            ".validate": "auth != null && auth.token.walletAddress != null && newData.val() == true && ($wallet == auth.token.walletAddress || $wallet == $conversationId.substring(0, 42) || $wallet == $conversationId.substring(43, 85))"
+          }
+        }
+      }
+    }
+  }
+}

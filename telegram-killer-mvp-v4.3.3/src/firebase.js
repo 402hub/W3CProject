@@ -11,25 +11,54 @@
  */
 
 import { initializeApp } from 'firebase/app';
+import { getAuth, indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence, setPersistence } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
+import { getPerformance } from 'firebase/performance';
 
-// TODO: Replace with your actual Firebase config
-// Get this from Firebase Console > Project Settings > Your apps
 const firebaseConfig = {
-  apiKey: "REPLACE WITH REAL",
-  authDomain: "REPLACE WITH REAL",
-  databaseURL: "REPLACE WITH REAL",
-  projectId: "REPLACE WITH REAL",
-  storageBucket: "REPLACE WITH REAL",
-  messagingSenderId: "REPLACE WITH REAL",
-  appId: "REPLACE WITH REAL"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'REPLACE WITH REAL',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'REPLACE WITH REAL',
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || 'REPLACE WITH REAL',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'REPLACE WITH REAL',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'REPLACE WITH REAL',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || 'REPLACE WITH REAL',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || 'REPLACE WITH REAL',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const isValueConfigured = (value) => !!value && !String(value).includes('REPLACE WITH REAL');
+const isFirebaseConfigured = Object.keys(firebaseConfig)
+  .filter((key) => key !== 'measurementId')
+  .every((key) => isValueConfigured(firebaseConfig[key]));
 
-// Get Realtime Database instance
-const database = getDatabase(app);
+let app = null;
+let database = null;
+let auth = null;
 
-export { database };
+if (isFirebaseConfigured) {
+  app = initializeApp(firebaseConfig);
+  database = getDatabase(app);
+
+  if (typeof window !== 'undefined') {
+    auth = getAuth(app);
+
+    setPersistence(auth, indexedDBLocalPersistence)
+      .catch(() => setPersistence(auth, browserLocalPersistence))
+      .catch(() => setPersistence(auth, inMemoryPersistence))
+      .catch((error) => {
+        console.warn('⚠️  [FIREBASE] Failed to set persistence mode:', error);
+      });
+
+    try {
+      getPerformance(app);
+      console.log('✅ [FIREBASE] Performance monitoring initialized');
+    } catch (perfError) {
+      console.warn('⚠️  [FIREBASE] Performance monitoring unavailable:', perfError.message);
+    }
+  }
+} else {
+  console.warn('⚠️  [FIREBASE] Skipping Firebase initialization - configuration missing');
+}
+
+export { app, auth, database, firebaseConfig, isFirebaseConfigured };
 export default app;

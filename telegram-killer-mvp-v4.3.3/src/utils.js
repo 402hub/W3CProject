@@ -72,3 +72,30 @@ export function shortenAddress(address) {
   if (!address) return '';
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
+
+export const MESSAGE_CHAR_LIMIT = 1000;
+
+export function sanitizeMessage(content) {
+  if (typeof content !== 'string') {
+    return '';
+  }
+
+  return content
+    .replace(/<\/?script[^>]*>/gi, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+    .trim()
+    .slice(0, MESSAGE_CHAR_LIMIT);
+}
+
+export function isMessageValid(content) {
+  if (typeof content !== 'string') {
+    return false;
+  }
+
+  const trimmed = content.trim();
+  return trimmed.length > 0 && trimmed.length <= MESSAGE_CHAR_LIMIT;
+}
+
+export function getRateLimitBucket(timestamp) {
+  return Math.floor(timestamp / 60000).toString();
+}

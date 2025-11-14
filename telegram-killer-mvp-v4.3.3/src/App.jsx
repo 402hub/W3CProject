@@ -34,36 +34,35 @@ function App() {
 
   // Handle wallet connection
   useEffect(() => {
-    if (isConnected && address) {
-      console.log('✅ Wallet connected:', address);
-      
-      // Check if this is a different wallet
-      const isDifferentWallet = isDbInitialized && address.toLowerCase() !== messageService.getAddress();
-      
-      if (isDifferentWallet) {
-        console.log('🔄 Different wallet detected, cleaning up...');
-        // Cleanup old wallet data
-        messageService.cleanup();
-        setWalletDisconnected();
-        // Re-initialize with new wallet
-        setWalletConnected(address);
-        initializeDatabase();
-      } else {
-        setWalletConnected(address);
-        
-        // Auto-initialize database if not already done
-        if (!isDbInitialized && !isInitializing) {
+    const syncWalletState = async () => {
+      if (isConnected && address) {
+        console.log('✅ Wallet connected:', address);
+
+        const isDifferentWallet =
+          isDbInitialized && address.toLowerCase() !== messageService.getAddress();
+
+        if (isDifferentWallet) {
+          console.log('🔄 Different wallet detected, cleaning up...');
+          await messageService.cleanup();
+          setWalletDisconnected();
+          setWalletConnected(address);
           initializeDatabase();
+        } else {
+          setWalletConnected(address);
+          if (!isDbInitialized && !isInitializing) {
+            initializeDatabase();
+          }
         }
+      } else if (!isConnected) {
+        console.log('❌ Wallet disconnected');
+        if (messageService.isReady()) {
+          await messageService.cleanup();
+        }
+        setWalletDisconnected();
       }
-    } else if (!isConnected) {
-      console.log('❌ Wallet disconnected');
-      // Cleanup database service
-      if (messageService.isReady()) {
-        messageService.cleanup();
-      }
-      setWalletDisconnected();
-    }
+    };
+
+    syncWalletState();
   }, [isConnected, address, isDbInitialized]);
 
   /**
@@ -98,8 +97,9 @@ function App() {
     }
   };
 
-  const handleDisconnect = () => {
-    disconnect();
+  const handleDisconnect = async () => {
+    await disconnect();
+    await messageService.cleanup();
     setWalletDisconnected();
   };
 
@@ -108,9 +108,9 @@ function App() {
       <header className="app-header">
         <div className="header-left">
           <h1>⚡ Tello</h1>
-          <span className="version-badge">v4.3.3</span>
+          <span className="version-badge">v4.4.0</span>
         </div>
-        
+
         {isConnected && (
           <div className="header-right">
             <span className="wallet-address">
@@ -128,7 +128,7 @@ function App() {
           {isLoading && <div className="spinner"></div>}
           <span>{status}</span>
         </div>
-        
+
         {dbError && (
           <div className="error-banner">
             <strong>Error:</strong> {dbError.message}
@@ -140,18 +140,18 @@ function App() {
         {!isConnected ? (
           <div className="welcome-screen">
             <div className="welcome-content">
-              <h2>Welcome to Tello v4.3.3</h2>
-              <p className="subtitle">🚀 Real P2P + Fixed WalletConnect!</p>
+              <h2>Welcome to Tello v4.4.0</h2>
+              <p className="subtitle">🚀 Performance & Security Foundation</p>
               <div className="features-list">
-                <div className="feature">🔥 Real-time P2P message delivery</div>
-                <div className="feature">📱 WalletConnect working (fixed!)</div>
-                <div className="feature">⚡ Instant local-first UI</div>
-                <div className="feature">🔒 Wallet-isolated conversations</div>
-                <div className="feature">📱 Full mobile wallet support</div>
+                <div className="feature">🔥 Real-time P2P with indexed queries</div>
+                <div className="feature">🛡️ Wallet-authenticated Firebase sync</div>
+                <div className="feature">⚡ Paginated conversations & messages</div>
+                <div className="feature">🔐 CSP, HTTPS, and XSS hardening</div>
+                <div className="feature">🚫 Rate limiting & 1000 char validation</div>
               </div>
               <p className="description">
-                Fast, secure messaging with wallet-based authentication.
-                Messages sync in real-time via Firebase!
+                Trillion-scale performance from day one. Secure wallet login, sanitized messaging, and
+                production-ready Firebase configuration included.
               </p>
               <WalletConnect />
             </div>
@@ -177,7 +177,6 @@ function App() {
         )}
       </main>
 
-      {/* Debug Panel */}
       {process.env.NODE_ENV === 'development' && (
         <div className="debug-panel">
           <strong>Debug Info:</strong>

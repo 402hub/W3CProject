@@ -18,9 +18,15 @@ export const useAppStore = create((set, get) => ({
   // Conversations state
   conversations: [],
   currentConversation: null,
+  hasMoreConversations: true,
+  nextConversationCursor: null,
+  isLoadingConversations: false,
   
   // Messages state
   messages: [],
+  hasMoreMessages: false,
+  nextMessageCursor: null,
+  isLoadingMessages: false,
   
   // UI state
   isLoading: false,
@@ -39,8 +45,12 @@ export const useAppStore = create((set, get) => ({
     isDbInitialized: false,
     dbClient: null,
     conversations: [],
+    hasMoreConversations: true,
+    nextConversationCursor: null,
     currentConversation: null,
     messages: [],
+    hasMoreMessages: false,
+    nextMessageCursor: null,
     status: 'Wallet disconnected',
   }),
   
@@ -56,13 +66,21 @@ export const useAppStore = create((set, get) => ({
     status: `Error: ${error.message}`,
   }),
   
-  setConversations: (conversations) => set({ conversations }),
+  setConversationsPage: ({ conversations, hasMore, nextCursor }) => set({
+    conversations,
+    hasMoreConversations: hasMore,
+    nextConversationCursor: nextCursor,
+  }),
+
+  setConversationsLoading: (isLoading) => set({ isLoadingConversations: isLoading }),
   
   setCurrentConversation: (conversation) => {
     console.log('🔄 [Store] Setting current conversation:', conversation);
     set({
       currentConversation: conversation,
       messages: [], // Clear messages when switching conversations
+      hasMoreMessages: false,
+      nextMessageCursor: null,
       status: conversation 
         ? `Chatting with ${conversation.peerAddress.slice(0, 6)}...${conversation.peerAddress.slice(-4)}`
         : 'Select a conversation',
@@ -70,15 +88,17 @@ export const useAppStore = create((set, get) => ({
     console.log('✅ [Store] Current conversation set, messages cleared');
   },
   
-  addMessage: (message) => set((state) => ({
-    messages: [...state.messages, message],
-  })),
-  
-  setMessages: (messages) => {
-    console.log('📥 [Store] Setting messages:', messages.length, messages);
-    set({ messages });
+  setMessagesPage: ({ messages, hasMore, nextCursor }) => {
+    console.log('📥 [Store] Setting messages:', messages.length);
+    set({
+      messages,
+      hasMoreMessages: hasMore,
+      nextMessageCursor: nextCursor,
+    });
     console.log('✅ [Store] Messages state updated');
   },
+
+  setMessagesLoading: (isLoading) => set({ isLoadingMessages: isLoading }),
   
   addMessageOptimistic: (content, tempId) => {
     const state = get();
@@ -117,4 +137,13 @@ export const useAppStore = create((set, get) => ({
   setLoading: (isLoading) => set({ isLoading }),
   
   setStatus: (status) => set({ status }),
+  
+  resetMessagingState: () => set({
+    messages: [],
+    hasMoreMessages: false,
+    nextMessageCursor: null,
+    conversations: [],
+    hasMoreConversations: true,
+    nextConversationCursor: null,
+  }),
 }));
