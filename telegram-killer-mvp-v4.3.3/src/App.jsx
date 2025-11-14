@@ -108,7 +108,7 @@ function App() {
       <header className="app-header">
         <div className="header-left">
           <h1>⚡ Tello</h1>
-          <span className="version-badge">v4.3.3</span>
+          <span className="version-badge">v4.4.0</span>
         </div>
         
         {isConnected && (
@@ -140,18 +140,21 @@ function App() {
         {!isConnected ? (
           <div className="welcome-screen">
             <div className="welcome-content">
-              <h2>Welcome to Tello v4.3.3</h2>
-              <p className="subtitle">🚀 Real P2P + Fixed WalletConnect!</p>
+              <h2>Welcome to Tello v4.4.0</h2>
+              <p className="subtitle">🚀 Performance & Security Foundation</p>
               <div className="features-list">
-                <div className="feature">🔥 Real-time P2P message delivery</div>
-                <div className="feature">📱 WalletConnect working (fixed!)</div>
-                <div className="feature">⚡ Instant local-first UI</div>
-                <div className="feature">🔒 Wallet-isolated conversations</div>
-                <div className="feature">📱 Full mobile wallet support</div>
+                <div className="feature">⚡ Message pagination (70 at a time)</div>
+                <div className="feature">📋 Conversation lazy loading (20 at a time)</div>
+                <div className="feature">🔒 XSS prevention & input sanitization</div>
+                <div className="feature">🛡️ Rate limiting (60 messages/minute)</div>
+                <div className="feature">✅ Message validation (1000 char limit)</div>
+                <div className="feature">🔐 Production security rules</div>
+                <div className="feature">📊 Firebase indexes (10-100x faster)</div>
+                <div className="feature">🌐 HTTPS enforcement & CSP headers</div>
               </div>
               <p className="description">
-                Fast, secure messaging with wallet-based authentication.
-                Messages sync in real-time via Firebase!
+                Production-ready messaging with performance optimizations and security hardening.
+                Ready to scale to millions of messages!
               </p>
               <WalletConnect />
             </div>

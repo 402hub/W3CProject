@@ -608,6 +608,59 @@ body {
   cursor: not-allowed;
 }
 
+/* v4.4.0: Load More Buttons */
+.load-more-container {
+  text-align: center;
+  padding: 1rem;
+}
+
+.load-more-conversations {
+  text-align: center;
+  padding: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.load-more-button {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.load-more-button:hover:not(:disabled) {
+  background: var(--secondary-color);
+}
+
+.load-more-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* v4.4.0: Rate Limit Error */
+.rate-limit-error {
+  background: #ffebee;
+  color: #c62828;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  border-left: 4px solid #c62828;
+}
+
+/* v4.4.0: Character Count Warning */
+.char-count-warning {
+  font-size: 0.75rem;
+  color: #f57c00;
+  margin-top: 0.25rem;
+  text-align: right;
+  padding-right: 0.5rem;
+}
+
 /* Debug Panel */
 .debug-panel {
   position: fixed;

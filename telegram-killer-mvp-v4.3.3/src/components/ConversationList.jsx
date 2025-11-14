@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
 import { messageService } from '../services/database';
 import { formatRelativeTime, shortenAddress } from '../utils';
+import { validateAddress } from '../utils/validation';
 
 function ConversationList() {
   const {
@@ -20,6 +21,8 @@ function ConversationList() {
 
   const [newAddress, setNewAddress] = useState('');
   const [isStarting, setIsStarting] = useState(false);
+  const [hasMoreConversations, setHasMoreConversations] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Load conversations on mount
   useEffect(() => {
@@ -36,12 +39,36 @@ function ConversationList() {
     };
   }, []);
 
-  const loadConversations = async () => {
+  const loadConversations = async (beforeTime = null) => {
     try {
-      const convos = await messageService.getConversations();
-      setConversations(convos);
+      const result = await messageService.getConversations(20, beforeTime); // Load 20 at a time
+      if (beforeTime) {
+        // Loading more - append to existing
+        setConversations([...conversations, ...result.conversations]);
+      } else {
+        // Initial load - replace all
+        setConversations(result.conversations);
+      }
+      setHasMoreConversations(result.hasMore);
     } catch (error) {
       console.error('Failed to load conversations:', error);
+    }
+  };
+
+  const loadMoreConversations = async () => {
+    if (isLoadingMore || !hasMoreConversations) return;
+    
+    setIsLoadingMore(true);
+    try {
+      // Get the oldest conversation timestamp
+      const oldestConversation = conversations[conversations.length - 1];
+      if (oldestConversation && oldestConversation.lastMessageTime) {
+        await loadConversations(oldestConversation.lastMessageTime);
+      }
+    } catch (error) {
+      console.error('Failed to load more conversations:', error);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -52,8 +79,8 @@ function ConversationList() {
       return;
     }
 
-    // Basic Ethereum address validation
-    if (!/^0x[a-fA-F0-9]{40}$/.test(newAddress)) {
+    // v4.4.0: Use validation utility
+    if (!validateAddress(newAddress)) {
       alert('Please enter a valid Ethereum address');
       return;
     }
@@ -121,42 +148,55 @@ function ConversationList() {
             <p className="hint">Enter an address above to start</p>
           </div>
         ) : (
-          conversations.map((conversation) => {
-            const isActive = currentConversation?.id === conversation.id;
-            const peerAddress = conversation.peerAddress;
-            const shortAddress = shortenAddress(peerAddress);
-            const hasUnread = conversation.unreadCount > 0;
-            
-            return (
-              <div
-                key={conversation.id}
-                className={`conversation-item ${isActive ? 'active' : ''}`}
-                onClick={() => selectConversation(conversation)}
-              >
-                <div className="conversation-avatar">
-                  {peerAddress.slice(2, 4).toUpperCase()}
-                </div>
-                <div className="conversation-info">
-                  <div className="conversation-header">
-                    <div className="conversation-address">{shortAddress}</div>
-                    {conversation.lastMessageTime && (
-                      <div className="conversation-time">
-                        {formatRelativeTime(conversation.lastMessageTime)}
-                      </div>
-                    )}
+          <>
+            {conversations.map((conversation) => {
+              const isActive = currentConversation?.id === conversation.id;
+              const peerAddress = conversation.peerAddress;
+              const shortAddress = shortenAddress(peerAddress);
+              const hasUnread = conversation.unreadCount > 0;
+              
+              return (
+                <div
+                  key={conversation.id}
+                  className={`conversation-item ${isActive ? 'active' : ''}`}
+                  onClick={() => selectConversation(conversation)}
+                >
+                  <div className="conversation-avatar">
+                    {peerAddress.slice(2, 4).toUpperCase()}
                   </div>
-                  <div className="conversation-last-message">
-                    {conversation.lastMessage ? 
-                      conversation.lastMessage.substring(0, 30) + (conversation.lastMessage.length > 30 ? '...' : '')
-                      : 'Click to open'}
+                  <div className="conversation-info">
+                    <div className="conversation-header">
+                      <div className="conversation-address">{shortAddress}</div>
+                      {conversation.lastMessageTime && (
+                        <div className="conversation-time">
+                          {formatRelativeTime(conversation.lastMessageTime)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="conversation-last-message">
+                      {conversation.lastMessage ? 
+                        conversation.lastMessage.substring(0, 30) + (conversation.lastMessage.length > 30 ? '...' : '')
+                        : 'Click to open'}
+                    </div>
                   </div>
+                  {hasUnread && (
+                    <div className="unread-badge">{conversation.unreadCount}</div>
+                  )}
                 </div>
-                {hasUnread && (
-                  <div className="unread-badge">{conversation.unreadCount}</div>
-                )}
+              );
+            })}
+            {hasMoreConversations && (
+              <div className="load-more-conversations">
+                <button 
+                  onClick={loadMoreConversations} 
+                  disabled={isLoadingMore}
+                  className="load-more-button"
+                >
+                  {isLoadingMore ? 'Loading...' : 'Load More Conversations'}
+                </button>
               </div>
-            );
-          })
+            )}
+          </>
         )}
       </div>
     </div>

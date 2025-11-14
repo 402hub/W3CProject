@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "conversations": {
+      "$conversationId": {
+        ".read": "$conversationId.contains(auth.uid) || $conversationId.contains(root.child('users').child(auth.uid).child('walletAddress').val())",
+        ".write": "$conversationId.contains(auth.uid) || $conversationId.contains(root.child('users').child(auth.uid).child('walletAddress').val())",
+        "messages": {
+          "$messageId": {
+            ".read": true,
+            ".write": "auth != null && newData.child('senderAddress').val() === root.child('users').child(auth.uid).child('walletAddress').val() && newData.child('content').val().length <= 1000 && newData.child('timestamp').val() === now",
+            ".validate": "newData.hasChildren(['senderAddress', 'recipientAddress', 'content', 'timestamp']) && newData.child('content').val().isString() && newData.child('content').val().length <= 1000 && newData.child('content').val().length > 0 && newData.child('timestamp').val() > 0 && newData.child('senderAddress').val().matches(/^0x[a-fA-F0-9]{40}$/) && newData.child('recipientAddress').val().matches(/^0x[a-fA-F0-9]{40}$/)"
+          }
+        }
+      }
+    },
+    "users": {
+      "$userId": {
+        ".read": "auth != null && $userId === auth.uid",
+        ".write": "auth != null && $userId === auth.uid"
+      }
+    }
+  }
+}

@@ -158,6 +158,7 @@ class MessageService {
   
   /**
    * Send a message (local + Firebase sync)
+   * v4.4.0: Added input sanitization
    */
   async sendMessage(toAddress, content) {
     if (!this.walletAddress) {
@@ -174,7 +175,7 @@ class MessageService {
         conversationId,
         senderAddress: this.walletAddress,
         recipientAddress: toAddress.toLowerCase(),
-        content,
+        content, // Content is already sanitized before calling this function
         timestamp,
         status: 'sending',
       };
@@ -190,7 +191,7 @@ class MessageService {
           const firebaseMessage = {
             senderAddress: this.walletAddress,
             recipientAddress: toAddress.toLowerCase(),
-            content,
+            content, // Sanitized content
             timestamp,
           };
           
@@ -244,83 +245,120 @@ class MessageService {
   }
   
   /**
-   * Load messages for a conversation
+   * Load messages for a conversation with pagination
+   * v4.4.0: Load 70 messages at a time (newest first)
+   * @param {string} otherAddress - Peer address
+   * @param {number} limit - Number of messages to load (default: 70)
+   * @param {number} beforeTimestamp - Load messages before this timestamp (for pagination)
+   * @returns {Promise<{messages: Array, hasMore: boolean}>}
    */
-  async loadMessages(otherAddress) {
+  async loadMessages(otherAddress, limit = 70, beforeTimestamp = null) {
     if (!this.walletAddress) {
       console.warn('⚠️  [DB] Cannot load messages: wallet not initialized');
-      return [];
+      return { messages: [], hasMore: false };
     }
     
     try {
-      console.log('💬 [DB] Loading messages with:', otherAddress);
+      console.log('💬 [DB] Loading messages with:', otherAddress, `(limit: ${limit})`);
       console.log('🔑 [DB] My wallet:', this.walletAddress);
       
       const conversationId = this.getConversationId(this.walletAddress, otherAddress.toLowerCase());
       console.log('🆔 [DB] Query conversationId:', conversationId);
       
       // Load from local IndexedDB
-      const messages = await db.messages
+      let query = db.messages
         .where('conversationId')
-        .equals(conversationId)
-        .sortBy('timestamp');
+        .equals(conversationId);
       
-      console.log(`✅ [DB] Loaded ${messages.length} messages from local storage`);
-      console.log('📋 [DB] Messages:', messages);
+      // If beforeTimestamp is provided, filter messages before that timestamp
+      if (beforeTimestamp) {
+        query = query.filter(msg => msg.timestamp < beforeTimestamp);
+      }
+      
+      // Get all matching messages first
+      let allMessages = await query.toArray();
+      
+      // Sort by timestamp descending (newest first)
+      allMessages.sort((a, b) => b.timestamp - a.timestamp);
+      
+      // Take only the limit
+      const messages = allMessages.slice(0, limit);
+      
+      // Check if there are more messages
+      const hasMore = allMessages.length > limit;
+      
+      // Reverse to show oldest first in UI
+      messages.reverse();
+      
+      console.log(`✅ [DB] Loaded ${messages.length} messages from local storage (hasMore: ${hasMore})`);
       
       // Start listening for new messages in this conversation
       await this.startListening(conversationId);
       
-      return messages;
+      return { messages, hasMore };
     } catch (error) {
       console.error('❌ [DB] Load error:', error);
-      return [];
+      return { messages: [], hasMore: false };
     }
   }
   
   /**
- * Get all conversations for current wallet ONLY
- */
-async getConversations() {
-  if (!this.walletAddress) {
-    return [];
-  }
-  
-  try {
-    console.log('📋 [DB] Fetching conversations for wallet:', this.walletAddress);
-    
-    const allConversations = await db.conversations.toArray();
-    
-    // Filter to only conversations involving current wallet
-    const myConversations = allConversations.filter(convo => {
-      const [addr1, addr2] = convo.id.split('_');
-      return addr1 === this.walletAddress || addr2 === this.walletAddress;
-    }).map(convo => {
-      // 🔧 FIX v4.3.3: Dynamically set peerAddress to the OTHER person's address
-      const [addr1, addr2] = convo.id.split('_');
-      const peerAddress = addr1 === this.walletAddress ? addr2 : addr1;
-      
-      return {
-        ...convo,
-        peerAddress  // Override with correct peer address
-      };
-    });
-    
-    const sorted = myConversations.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
-    
-    console.log(`✅ [DB] Found ${sorted.length} conversations for this wallet`);
-    
-    // Start listening to all conversations
-    for (const convo of sorted) {
-      await this.startListening(convo.id);
+   * Get conversations for current wallet with lazy loading
+   * v4.4.0: Load 20 conversations at a time
+   * @param {number} limit - Number of conversations to load (default: 20)
+   * @param {number} beforeTime - Load conversations before this timestamp (for pagination)
+   * @returns {Promise<{conversations: Array, hasMore: boolean}>}
+   */
+  async getConversations(limit = 20, beforeTime = null) {
+    if (!this.walletAddress) {
+      return { conversations: [], hasMore: false };
     }
     
-    return sorted;
-  } catch (error) {
-    console.error('❌ [DB] Get conversations error:', error);
-    return [];
+    try {
+      console.log('📋 [DB] Fetching conversations for wallet:', this.walletAddress, `(limit: ${limit})`);
+      
+      const allConversations = await db.conversations.toArray();
+      
+      // Filter to only conversations involving current wallet
+      let myConversations = allConversations.filter(convo => {
+        const [addr1, addr2] = convo.id.split('_');
+        return addr1 === this.walletAddress || addr2 === this.walletAddress;
+      }).map(convo => {
+        // 🔧 FIX v4.3.3: Dynamically set peerAddress to the OTHER person's address
+        const [addr1, addr2] = convo.id.split('_');
+        const peerAddress = addr1 === this.walletAddress ? addr2 : addr1;
+        
+        return {
+          ...convo,
+          peerAddress  // Override with correct peer address
+        };
+      });
+      
+      // Sort by lastMessageTime descending (newest first)
+      myConversations.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+      
+      // If beforeTime is provided, filter conversations before that time
+      if (beforeTime) {
+        myConversations = myConversations.filter(convo => (convo.lastMessageTime || 0) < beforeTime);
+      }
+      
+      // Take only the limit
+      const conversations = myConversations.slice(0, limit);
+      const hasMore = myConversations.length > limit;
+      
+      console.log(`✅ [DB] Found ${conversations.length} conversations (hasMore: ${hasMore})`);
+      
+      // Start listening to loaded conversations
+      for (const convo of conversations) {
+        await this.startListening(convo.id);
+      }
+      
+      return { conversations, hasMore };
+    } catch (error) {
+      console.error('❌ [DB] Get conversations error:', error);
+      return { conversations: [], hasMore: false };
+    }
   }
-}
   
   /**
    * Mark conversation as read

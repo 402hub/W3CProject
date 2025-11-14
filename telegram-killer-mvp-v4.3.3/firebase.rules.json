@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "conversations": {
+      "$conversationId": {
+        ".read": true,
+        ".write": true,
+        "messages": {
+          "$messageId": {
+            ".read": true,
+            ".write": true,
+            ".validate": "newData.hasChildren(['senderAddress', 'recipientAddress', 'content', 'timestamp']) && newData.child('content').val().isString() && newData.child('content').val().length <= 1000 && newData.child('content').val().length > 0 && newData.child('timestamp').val() > 0 && newData.child('senderAddress').val().matches(/^0x[a-fA-F0-9]{40}$/) && newData.child('recipientAddress').val().matches(/^0x[a-fA-F0-9]{40}$/)"
+          }
+        }
+      }
+    }
+  }
+}

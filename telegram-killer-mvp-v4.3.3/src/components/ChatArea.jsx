@@ -8,6 +8,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/appStore';
 import { messageService } from '../services/database';
 import { formatMessageTime } from '../utils';
+import { sanitizeInput, validateMessage } from '../utils/validation';
+import { rateLimiter } from '../utils/rateLimiter';
 
 function ChatArea() {
   const {
@@ -23,7 +25,11 @@ function ChatArea() {
 
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [rateLimitError, setRateLimitError] = useState(null);
   const messagesEndRef = useRef(null);
+  const messagesTopRef = useRef(null);
 
   // Debug: Log messages state changes
   useEffect(() => {
@@ -59,26 +65,76 @@ function ChatArea() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const loadMessages = async () => {
+  const loadMessages = async (beforeTimestamp = null) => {
     if (!currentConversation) return;
 
     try {
       console.log('🔍 [ChatArea] Loading messages for:', currentConversation.peerAddress);
-      const loadedMessages = await messageService.loadMessages(currentConversation.peerAddress);
-      console.log('📦 [ChatArea] Loaded messages:', loadedMessages.length, loadedMessages);
-      setMessages(loadedMessages);
+      const result = await messageService.loadMessages(
+        currentConversation.peerAddress,
+        70, // Load 70 messages at a time
+        beforeTimestamp
+      );
+      console.log('📦 [ChatArea] Loaded messages:', result.messages.length, 'hasMore:', result.hasMore);
+      
+      if (beforeTimestamp) {
+        // Loading older messages - prepend to existing
+        setMessages([...result.messages, ...messages]);
+      } else {
+        // Initial load - replace all messages
+        setMessages(result.messages);
+      }
+      
+      setHasMoreMessages(result.hasMore);
       console.log('✅ [ChatArea] Messages set in store');
     } catch (error) {
       console.error('❌ [ChatArea] Failed to load messages:', error);
     }
   };
 
+  const loadMoreMessages = async () => {
+    if (!currentConversation || isLoadingMore || !hasMoreMessages) return;
+    
+    setIsLoadingMore(true);
+    try {
+      // Get the oldest message timestamp
+      const oldestMessage = messages[0];
+      if (oldestMessage) {
+        await loadMessages(oldestMessage.timestamp);
+      }
+    } catch (error) {
+      console.error('❌ [ChatArea] Failed to load more messages:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   const sendMessage = async (e) => {
     e.preventDefault();
     
-    const content = messageInput.trim();
-    if (!content || !currentConversation) return;
+    const rawContent = messageInput.trim();
+    if (!rawContent || !currentConversation) return;
 
+    // v4.4.0: Validate message
+    const validation = validateMessage(rawContent);
+    if (!validation.valid) {
+      alert(validation.error);
+      return;
+    }
+
+    // v4.4.0: Rate limiting check
+    const rateLimit = rateLimiter.canSend(walletAddress);
+    if (!rateLimit.allowed) {
+      const resetTime = new Date(rateLimit.resetAt).toLocaleTimeString();
+      setRateLimitError(`Rate limit exceeded. Try again after ${resetTime}`);
+      setTimeout(() => setRateLimitError(null), 5000);
+      return;
+    }
+    setRateLimitError(null);
+
+    // v4.4.0: Sanitize input (XSS prevention)
+    const content = sanitizeInput(rawContent);
+    
     // Generate temp ID for optimistic update
     const tempId = `temp-${Date.now()}`;
     
@@ -143,6 +199,17 @@ function ChatArea() {
       </div>
 
       <div className="messages-container">
+        {hasMoreMessages && (
+          <div className="load-more-container" ref={messagesTopRef}>
+            <button 
+              onClick={loadMoreMessages} 
+              disabled={isLoadingMore}
+              className="load-more-button"
+            >
+              {isLoadingMore ? 'Loading...' : 'Load More Messages'}
+            </button>
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="empty-messages">
             <p>No messages yet</p>
@@ -172,14 +239,22 @@ function ChatArea() {
       </div>
 
       <div className="message-input-container">
+        {rateLimitError && (
+          <div className="rate-limit-error">{rateLimitError}</div>
+        )}
         <form onSubmit={sendMessage}>
           <input
             type="text"
             value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            placeholder="Type a message..."
+            onChange={(e) => {
+              setMessageInput(e.target.value);
+              // Clear rate limit error when user types
+              if (rateLimitError) setRateLimitError(null);
+            }}
+            placeholder={`Type a message... (${messageInput.length}/1000)`}
             disabled={isSending}
             className="message-input"
+            maxLength={1000}
           />
           <button
             type="submit"
@@ -189,6 +264,11 @@ function ChatArea() {
             {isSending ? '...' : '➤'}
           </button>
         </form>
+        {messageInput.length > 900 && (
+          <div className="char-count-warning">
+            {1000 - messageInput.length} characters remaining
+          </div>
+        )}
       </div>
     </div>
   );
